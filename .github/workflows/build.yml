@@ -1,0 +1,116 @@
+# Builds the app on every push, and puts PPSA52005.zip (what homebrew stores
+# install) on releases:
+#   - Push a tag such as v0.1.0-beta: the app is built and a release for that
+#     tag is published with the zip; a tag with alpha, beta or rc in it becomes
+#     a pre-release. The sha256 goes under the notes.
+#   - Publish a release on GitHub with any tag: the zip is attached a few
+#     minutes later.
+#   - Actions > Build > Run workflow, with "Release tag" filled in: builds it
+#     and attaches the zip to that release, creating it if it doesn't exist.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish, e.g. v0.1.1-beta (created if new; empty only builds)
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check out an existing release tag
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          # an existing tag is rebuilt as it was; a new one is made from this branch
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then git checkout -q "refs/tags/$TAG"; fi
+
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends make ninja-build python3 unzip zip curl \
+            clang-18 lld-18 llvm-18 libclang-rt-18-dev libc++-18-dev libc++abi-18-dev
+          for tool in clang clang++ ld.lld llvm-ar llvm-ranlib; do
+            sudo ln -sf "/usr/bin/$tool-18" "/usr/local/bin/$tool"
+          done
+
+      - name: Decide what to publish
+        id: target
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("sce_sys/param.json"))["contentVersion"])')
+          echo "contentVersion: $version"
+          mode=none
+          tag=
+          if [[ $GITHUB_EVENT_NAME == release ]]; then
+            mode=attach; tag=$GITHUB_REF_NAME
+          elif [[ $GITHUB_EVENT_NAME == push && $GITHUB_REF == refs/tags/* ]]; then
+            mode=attach; tag=$GITHUB_REF_NAME
+          elif [[ $GITHUB_EVENT_NAME == workflow_dispatch && -n $INPUT_TAG ]]; then
+            mode=attach; tag=$INPUT_TAG
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish: $mode $tag"
+
+      - name: Test
+        run: make test
+
+      - name: Build
+        run: make USE_CCACHE=0
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: PPSA52005
+          path: dist/PPSA52005.zip
+
+      - name: Publish
+        if: steps.target.outputs.mode != 'none'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          sha=$(sha256sum dist/PPSA52005.zip | cut -d ' ' -f 1)
+          line="\`PPSA52005.zip\` sha256: \`$sha\`"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # a new release: from this commit, a pre-release for alpha/beta/rc tags
+            pre=()
+            shopt -s nocasematch
+            [[ $TAG == *alpha* || $TAG == *beta* || $TAG == *rc* ]] && pre=(--prerelease)
+            { cat .github/release-notes.md; printf '\n%s\n' "$line"; } > notes.md
+            gh release create "$TAG" dist/PPSA52005.zip --repo "$GITHUB_REPOSITORY" "${pre[@]}" \
+              --verify-tag --title "KamTape for PS5 ${TAG#v}" --notes-file notes.md 2>/dev/null ||
+            gh release create "$TAG" dist/PPSA52005.zip --repo "$GITHUB_REPOSITORY" "${pre[@]}" \
+              --target "$GITHUB_SHA" --title "KamTape for PS5 ${TAG#v}" --notes-file notes.md
+          else
+            gh release upload "$TAG" dist/PPSA52005.zip --clobber --repo "$GITHUB_REPOSITORY"
+            # keep the release's own title and notes; replace an older digest line
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > body.md
+            python3 - "$line" <<'PY'
+          import sys
+          kept = [l for l in open("body.md").read().splitlines()
+                  if not l.startswith("`PPSA52005.zip` sha256:")]
+          text = "\n".join(kept).rstrip()
+          open("notes.md", "w").write((text + "\n\n" if text else "") + sys.argv[1] + "\n")
+          PY
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          fi
+          echo "$line"
