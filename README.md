@@ -1,7 +1,7 @@
 # KamTape for PS5
 
 A native PS5 homebrew app (PPSA52005) for [KamTape](https://www.kamtape.com/), the
-retro video site in the style of 2005. It opens **[KamTape XL](https://www.kamtape.com/xl/)**,
+retro video site in the style of 2007. It opens **[KamTape XL](https://www.kamtape.com/xl/)**,
 KamTape's TV interface, in the PS5's web browser, straight from the home screen.
 
 This is an unofficial app. It is not made or endorsed by KamTape.
