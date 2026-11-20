@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ut_response status="ok">
+<video_list>
+    <video>
+        <author>tapehead88</author>
+        <id>vhs01aaaaaa</id>
+        <title>Rainy Day Skate Session</title>
+        <length_seconds>132</length_seconds>
+        <rating_avg>3.00</rating_avg>
+        <rating_count>5</rating_count>
+        <description>Rainy Day Skate Session. Filmed on a camcorder and uploaded the same night.</description>
+        <view_count>120</view_count>
+        <upload_time>1121398533</upload_time>
+        <comment_count>0</comment_count>
+        <tags>skate rain friends music</tags>
+        <url>http://www.kamtape.com/watch?v=vhs01aaaaaa</url>
+        <thumbnail_url>http://www.kamtape.com/get_still?video_id=vhs01aaaaaa</thumbnail_url>
+    </video>
+    <video>
+        <author>tapehead88</author>
+        <id>vhs05eeeeee</id>
+        <title>Road Trip to the Big Lake</title>
+        <length_seconds>506</length_seconds>
+        <rating_avg>3.80</rating_avg>
+        <rating_count>17</rating_count>
+        <description>Road Trip to the Big Lake. Filmed on a camcorder and uploaded the same night.</description>
+        <view_count>268</view_count>
+        <upload_time>1124508933</upload_time>
+        <comment_count>0</comment_count>
+        <tags>travel lake summer road</tags>
+        <url>http://www.kamtape.com/watch?v=vhs05eeeeee</url>
+        <thumbnail_url>http://www.kamtape.com/get_still?video_id=vhs05eeeeee</thumbnail_url>
+    </video>
+</video_list>
+</ut_response>

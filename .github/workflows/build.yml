@@ -45,7 +45,7 @@ jobs:
       - name: Install the toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends make ninja-build python3 unzip zip curl \
+          sudo apt-get install -y --no-install-recommends make ninja-build python3 unzip zip curl wget tar pkg-config \
             clang-18 lld-18 llvm-18 libclang-rt-18-dev libc++-18-dev libc++abi-18-dev
           for tool in clang clang++ ld.lld llvm-ar llvm-ranlib; do
             sudo ln -sf "/usr/bin/$tool-18" "/usr/local/bin/$tool"

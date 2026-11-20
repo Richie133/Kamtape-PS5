@@ -16,7 +16,7 @@ build="$root/build/host-snapshots"
 ninja_begin "$build/build.ninja"
 
 sources=("$root/host/snapshot_main.cpp" "$root/host/platform_host.cpp" "$root/host/services_host.cpp"
-         "$root/host/audio_host.cpp")
+         "$root/host/audio_host.cpp" "$root/host/http_host.cpp")
 while IFS= read -r -d '' source; do
     sources+=("$source")
 done < <(find "$root/src" -type f \( -name '*.cpp' -o -name '*.c' \) \
@@ -48,5 +48,5 @@ grep -E 'warning' -A4 "$build/build.log" | head -60 >&2 || true
 output=${1:-"$root/build/snapshots"}
 mkdir -p "$output"
 [[ ${SNAPSHOTS_BUILD_ONLY:-0} == 1 ]] && exit 0
-EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+KT_FIXTURES="$root/host/fixtures" EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
     "$build/kt_snapshots" "$root/assets" "$output"

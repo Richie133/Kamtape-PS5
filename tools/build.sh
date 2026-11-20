@@ -221,6 +221,11 @@ wrap_options=()
 if grep -qs '__wrap_sceSystemServiceHideSplashScreen' "$root/src/runtime/runtime_shims.c"; then
     wrap_options+=("--wrap=sceSystemServiceHideSplashScreen")
 fi
+# libcurl's standalone shim wraps fcntl so curl's socket calls work in a
+# sandboxed title (src/platform/ps5/console_curl.c).
+if grep -qs '__wrap_fcntl' "$root/src/platform/ps5/console_curl.c" 2>/dev/null; then
+    wrap_options+=("--wrap=fcntl")
+fi
 if [[ -f $root/src/runtime/app_heap.c ]]; then
     for symbol in malloc calloc realloc free posix_memalign malloc_usable_size; do
         wrap_options+=("--wrap=$symbol")

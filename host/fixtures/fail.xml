@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ut_response status="fail">
+<error>
+    <code>8</code>
+    <description>Missing or unknown dev_id.</description>
+</error>
+</ut_response>

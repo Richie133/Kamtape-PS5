@@ -29,7 +29,7 @@ namespace
 
 constexpr const char *kAssets = "/app0/assets";
 // A title's sandbox has no /data: settings live in its own storage.
-constexpr const char *kSettings = "/download0/kamtape/settings.json";
+constexpr const char *kSettingsDir = "/download0/kamtape";
 
 bool load_font(hui::gfx::Renderer &renderer, const char *name, hui::gfx::Font *font, hui::ui::FontRef *ref)
 {
@@ -82,7 +82,7 @@ int main()
     kt::audio::init(kAssets);
 
     kt::App app(fonts, logo, logo_h > 0 ? static_cast<float>(logo_w) / static_cast<float>(logo_h) : 1.0f,
-                kSettings);
+                kSettingsDir);
 
     gfx::DrawList list;
     PadSample samples[64];

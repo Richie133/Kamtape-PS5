@@ -26,7 +26,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "third_party/stb_image_write.h"
 
+#include <chrono>
 #include <cstdio>
+#include <thread>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -75,17 +77,31 @@ struct Step
 const Step kTour[] = {
     {"", 2.0f, "01-start-opens-xl"},
     {"", 4.0f, "02-home"},
-    {"right", 0.8f, "03-full-site"},
-    {"type:watch?v=dQw4w9WgXcQ", 1.0f, "04-go-to-page"},
-    {"type:kamtape.com/browse", 4.5f, nullptr},
+    {"right", 0.8f, "03-featured-tile"},
+    {"cross", 0.25f, "04-loading"},
+    {"", 2.5f, "05-featured-videos"},
+    {"right", 0.15f, nullptr},
+    {"right", 0.15f, nullptr},
+    {"down", 1.0f, "06-video-focused"},
+    {"up", 0.15f, nullptr},
+    {"cross", 2.0f, "07-details"},
+    {"right", 0.6f, "08-details-author"},
+    {"cross", 2.0f, "09-videos-by-author"},
+    {"circle", 0.3f, nullptr},
+    {"circle", 0.3f, nullptr},
+    {"type:music", 2.5f, "10-tag-search"},
+    {"circle", 0.3f, nullptr},
+    {"circle", 0.6f, nullptr},
+    {"env:KT_FIXTURE_FAIL=1", 0.0f, nullptr},
+    {"up", 0.2f, nullptr},
+    {"cross", 2.0f, "11-api-error"},
+    {"env:KT_FIXTURE_FAIL=", 0.0f, nullptr},
+    {"circle", 0.6f, nullptr},
     {"down", 0.2f, nullptr},
     {"down", 0.2f, nullptr},
-    {"down", 0.8f, "05-recent-pages"},
-    {"type:youtube.com/watch?v=abc", 1.0f, "06-other-site"},
-    {"options", 4.5f, "07-settings"},
-    {"down", 0.3f, nullptr},
-    {"left", 0.8f, "08-settings-sounds"},
-    {"circle", 1.2f, "09-back-home"},
+    {"typex:watch?v=dQw4w9WgXcQ", 4.5f, nullptr},
+    {"options", 1.2f, "12-settings"},
+    {"circle", 1.2f, "13-back-home"},
 };
 
 hui::InputFrame press(const std::string &n)
@@ -109,6 +125,8 @@ hui::InputFrame press(const std::string &n)
         bit(Action::back);
     else if (n == "triangle")
         bit(Action::north);
+    else if (n == "square")
+        bit(Action::west);
     else if (n == "options")
         bit(Action::menu);
     return f;
@@ -157,7 +175,7 @@ int main(int argc, char **argv)
     hui::kt::services::init();
     hui::kt::audio::init(assets);
     hui::kt::App app(fonts, logo, logo_h > 0 ? static_cast<float>(logo_w) / static_cast<float>(logo_h) : 1.0f,
-                     output + "/settings.json");
+                     output);
 
     hui::gfx::DrawList list;
     std::vector<unsigned char> pixels(static_cast<std::size_t>(width) * height * 4);
@@ -186,15 +204,34 @@ int main(int argc, char **argv)
     for (const Step &step : kTour)
     {
         std::string what = step.press;
+        if (what.rfind("env:", 0) == 0)
+        {
+            const std::string kv = what.substr(4);
+            const std::size_t eq = kv.find('=');
+            if (eq + 1 < kv.size())
+                setenv(kv.substr(0, eq).c_str(), kv.substr(eq + 1).c_str(), 1);
+            else
+                unsetenv(kv.substr(0, eq).c_str());
+            continue;
+        }
         if (what.rfind("type:", 0) == 0)
         {
             setenv("KT_KEYBOARD_TEXT", what.c_str() + 5, 1);
-            what = "triangle";
+            what = "triangle"; // search
+        }
+        else if (what.rfind("typex:", 0) == 0)
+        {
+            setenv("KT_KEYBOARD_TEXT", what.c_str() + 6, 1);
+            what = "cross"; // on a tile that opens the keyboard
         }
         app.update(what.empty() ? hui::InputFrame{} : press(what), kDt);
         const int frames = static_cast<int>(step.settle * 60.0f);
         for (int i = 0; i < frames; ++i)
+        {
+            // real time passes too, so downloads on the worker threads can finish
+            std::this_thread::sleep_for(std::chrono::microseconds(16667));
             app.update(hui::InputFrame{}, kDt);
+        }
         if (step.picture != nullptr)
             all = picture(step.picture) && all;
     }

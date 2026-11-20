@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ut_response status="ok">
+<video_details>
+    <author>dvdlad</author>
+    <title>Trying Every Button on the Old Remote</title>
+    <rating_avg>4.50</rating_avg>
+    <rating_count>22</rating_count>
+    <tags>funny tv retro remote</tags>
+    <description>Found the remote for our old TV in a drawer. Some of these buttons have never been pressed. Some of them should not have been.</description>
+    <update_time>1123000000</update_time>
+    <view_count>1342</view_count>
+    <upload_time>1122900000</upload_time>
+    <length_seconds>173</length_seconds>
+    <recording_date>None</recording_date>
+    <recording_location/>
+    <recording_country/>
+    <comment_list>
+        <comment>
+            <author>tapehead88</author>
+            <text>the MUTE button at the end got me</text>
+            <time>1122950000</time>
+        </comment>
+        <comment>
+            <author>lunchbox</author>
+            <text>we had the exact same tv &amp; remote!!</text>
+            <time>1122960000</time>
+        </comment>
+    </comment_list>
+    <channel_list>
+        <channel>Humor</channel>
+        <channel>Odd &amp; Outrageous</channel>
+    </channel_list>
+    <thumbnail_url>http://www.kamtape.com/get_still?video_id=vhs07gggggg</thumbnail_url>
+</video_details>
+</ut_response>
