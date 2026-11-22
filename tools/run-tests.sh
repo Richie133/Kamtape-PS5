@@ -8,7 +8,7 @@ out="$root/build/tests"
 mkdir -p "$out"
 flags=(-std=c++20 -O1 -Wall -Wextra -Werror -I"$root/src")
 common=("$root/src/kt/json.cpp" "$root/src/core/save_file.cpp")
-"$cxx" "${flags[@]}" "$root/host/address_test.cpp" "$root/src/kt/address.cpp" "$root/src/kt/settings.cpp" \
+"$cxx" "${flags[@]}" "$root/host/address_test.cpp" "$root/src/kt/address.cpp" "$root/src/kt/settings.cpp" "$root/src/kt/text_field.cpp" \
     "${common[@]}" -o "$out/address_test"
 "$cxx" "${flags[@]}" "$root/host/api_test.cpp" "$root/src/kt/api.cpp" "$root/src/kt/xml.cpp" \
     "$root/src/kt/http_escape.cpp" "${common[@]}" -o "$out/api_test"

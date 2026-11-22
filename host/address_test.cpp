@@ -3,6 +3,7 @@
 
 #include "kt/address.hpp"
 #include "kt/settings.hpp"
+#include "kt/text_field.hpp"
 
 #include <cstdio>
 #include <string>
@@ -71,6 +72,47 @@ int main()
     if (s.recent != std::vector<std::string>{"b", "f", "e", "d", "c"})
     {
         std::printf("FAIL Settings::remember\n");
+        ++failures;
+    }
+
+    for (const char *u : {"cats", "music", "cats"})
+        s.remember_search(u);
+    if (s.searches != std::vector<std::string>{"cats", "music"})
+    {
+        std::printf("FAIL Settings::remember_search\n");
+        ++failures;
+    }
+
+    // the on-screen keyboard's text and cursor
+    hui::kt::TextField f;
+    f.set("kamtape.com/");
+    f.insert("xl");
+    f.left();
+    f.left();
+    f.left();
+    f.insert("!");
+    f.erase_back();
+    f.erase_forward();
+    f.end();
+    f.insert("/");
+    hui::kt::TextField u;
+    u.set("caf\xC3\xA9");
+    u.erase_back(); // one character, two bytes
+    u.home();
+    u.erase_back(); // nothing before the start
+    u.right();
+    u.erase_forward();
+    if (f.text != "kamtape.comxl/" || u.text != "cf" || u.cursor != 1)
+    {
+        std::printf("FAIL TextField: \"%s\" \"%s\" %zu\n", f.text.c_str(), u.text.c_str(), u.cursor);
+        ++failures;
+    }
+    hui::kt::TextField big;
+    big.set(std::string(300, 'a'));
+    big.insert("b");
+    if (big.text.size() != hui::kt::TextField::kMaxBytes)
+    {
+        std::printf("FAIL TextField limit\n");
         ++failures;
     }
 

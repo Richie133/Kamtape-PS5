@@ -12,6 +12,7 @@
 #include "gfx/renderer.hpp"
 #include "kt/app.hpp"
 #include "kt/audio.hpp"
+#include "kt/hid.hpp"
 #include "kt/services.hpp"
 #include "platform/ps5/display_egl.hpp"
 #include "platform/ps5/pad.hpp"
@@ -85,6 +86,7 @@ int main()
                 kSettingsDir);
 
     gfx::DrawList list;
+    bool usb_open = false;
     PadSample samples[64];
     std::uint64_t frames = 0;
     std::int64_t last = sys::monotonic_us();
@@ -99,7 +101,8 @@ int main()
         const InputFrame input =
             tracker.update(std::span<const PadSample>(samples, count), static_cast<std::uint64_t>(now));
 
-        app.update(input, dt);
+        const kt::hid::Frame usb = usb_open ? kt::hid::read() : kt::hid::Frame{};
+        app.update(input, usb, dt);
 
         list.clear();
         app.draw(list);
@@ -119,6 +122,13 @@ int main()
         {
             const bool hidden = sys::hide_splash_screen();
             sys::log("[KT] ready splash_hidden=%d", hidden ? 1 : 0);
+        }
+        else if (frames == 30 && app.begin_usb())
+        {
+            // after the first frames, so a crash here can't stop the app from showing
+            usb_open = kt::hid::open(pad.user());
+            app.end_usb(usb_open);
+            sys::log("[KT] usb keyboard %s", usb_open ? "open" : "unavailable");
         }
     }
 }

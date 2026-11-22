@@ -9,6 +9,8 @@
 #include "gfx/draw_list.hpp"
 #include "kt/api.hpp"
 #include "kt/api_client.hpp"
+#include "kt/hid.hpp"
+#include "kt/osk.hpp"
 #include "kt/settings.hpp"
 #include "kt/thumbs.hpp"
 #include "ui/fonts.hpp"
@@ -21,7 +23,7 @@
 namespace hui::kt
 {
 
-constexpr const char *kVersion = "0.2.0 beta";
+constexpr const char *kVersion = "0.3.0 beta";
 constexpr const char *kSourceUrl = "github.com/Richie133/Kamtape-PS5";
 
 struct Fonts
@@ -39,7 +41,13 @@ class App
     App(const Fonts &fonts, std::uint32_t logo, float logo_aspect, std::string settings_dir);
     ~App();
 
-    void update(const InputFrame &input, float dt);
+    // usb: what a USB keyboard typed this frame (empty when there is none).
+    void update(const InputFrame &input, const hid::Frame &usb, float dt);
+    // The USB keyboard starts once, guarded: begin_usb() says whether to try
+    // (not when it's off in Settings, or when the last try crashed the app);
+    // end_usb() after hid::open returns.
+    bool begin_usb();
+    void end_usb(bool opened);
     void draw(gfx::DrawList &list) const;
     // Nothing is moving or loading: the intro and the focus have settled.
     bool idle() const;
@@ -132,7 +140,9 @@ class App
     std::vector<Choice> details_choices(const Page &page) const;
     // shared
     void open(const std::string &url, const std::string &what);
-    void open_keyboard(Keyboard purpose);
+    void open_keyboard(Keyboard purpose, const std::string &start = std::string());
+    // A USB keyboard drives the screens like a controller when the on-screen keyboard is closed.
+    void usb_navigation(const hid::Frame &usb, InputFrame &input);
     void finish_keyboard(const std::string &text);
     void show_status(std::string text, bool error);
     void sound_move() const;
@@ -180,7 +190,8 @@ class App
     float screen_time_ = 0.0f; // since home or settings opened
     bool auto_open_done_ = false;
     float last_open_ = -10.0f; // when the browser was last asked to open
-    Keyboard keyboard_ = Keyboard::none;
+    Keyboard keyboard_ = Keyboard::none; // what's being typed for, by either keyboard
+    OnScreenKeyboard osk_;
 
     std::string status_;
     bool status_error_ = false;

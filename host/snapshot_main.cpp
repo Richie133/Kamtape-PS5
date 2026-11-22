@@ -16,6 +16,7 @@
 #include "gfx/renderer.hpp"
 #include "kt/app.hpp"
 #include "kt/audio.hpp"
+#include "kt/hid.hpp"
 #include "kt/services.hpp"
 #include "ui/fonts.hpp"
 
@@ -32,6 +33,11 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+
+namespace hui::kt::hid
+{
+void hid_host_push(const Frame &f);
+}
 
 namespace
 {
@@ -89,19 +95,34 @@ const Step kTour[] = {
     {"cross", 2.0f, "09-videos-by-author"},
     {"circle", 0.3f, nullptr},
     {"circle", 0.3f, nullptr},
-    {"type:music", 2.5f, "10-tag-search"},
+    // the on-screen keyboard: open it, type "mu" with the controller, the rest on a USB keyboard
+    {"triangle", 0.6f, "10-keyboard"},
+    {"down", 0.1f, nullptr},  // from q to a
+    {"down", 0.1f, nullptr},  // z
+    {"right", 0.1f, nullptr}, // x
+    {"right", 0.1f, nullptr}, // c
+    {"right", 0.1f, nullptr}, // v
+    {"right", 0.1f, nullptr}, // b
+    {"right", 0.1f, nullptr}, // n
+    {"right", 0.1f, nullptr}, // m
+    {"cross", 0.1f, nullptr},
+    {"usb:usic", 0.6f, "11-keyboard-typing"},
+    {"options", 2.5f, "12-tag-search"},
     {"circle", 0.3f, nullptr},
+    {"circle", 0.6f, nullptr},
+    {"triangle", 0.6f, "13-keyboard-recent"},
     {"circle", 0.6f, nullptr},
     {"env:KT_FIXTURE_FAIL=1", 0.0f, nullptr},
     {"up", 0.2f, nullptr},
-    {"cross", 2.0f, "11-api-error"},
+    {"cross", 2.0f, "14-api-error"},
     {"env:KT_FIXTURE_FAIL=", 0.0f, nullptr},
     {"circle", 0.6f, nullptr},
     {"down", 0.2f, nullptr},
     {"down", 0.2f, nullptr},
-    {"typex:watch?v=dQw4w9WgXcQ", 4.5f, nullptr},
-    {"options", 1.2f, "12-settings"},
-    {"circle", 1.2f, "13-back-home"},
+    {"cross", 0.6f, "15-keyboard-address"},
+    {"usb:watch?v=dQw4w9WgXcQ\n", 4.5f, nullptr},
+    {"options", 1.2f, "16-settings"},
+    {"circle", 1.2f, "17-back-home"},
 };
 
 hui::InputFrame press(const std::string &n)
@@ -127,6 +148,10 @@ hui::InputFrame press(const std::string &n)
         bit(Action::north);
     else if (n == "square")
         bit(Action::west);
+    else if (n == "l1")
+        bit(Action::page_prev);
+    else if (n == "r1")
+        bit(Action::page_next);
     else if (n == "options")
         bit(Action::menu);
     return f;
@@ -214,23 +239,28 @@ int main(int argc, char **argv)
                 unsetenv(kv.substr(0, eq).c_str());
             continue;
         }
-        if (what.rfind("type:", 0) == 0)
+        if (what.rfind("usb:", 0) == 0)
         {
-            setenv("KT_KEYBOARD_TEXT", what.c_str() + 5, 1);
-            what = "triangle"; // search
+            // typing on a USB keyboard; a trailing "\n" presses Enter
+            hui::kt::hid::Frame typed;
+            typed.keyboard = true;
+            for (char c : what.substr(4))
+            {
+                if (c == '\n')
+                    typed.pressed.push_back(hui::kt::hid::key::kEnter);
+                else
+                    typed.text.push_back(c);
+            }
+            hui::kt::hid::hid_host_push(typed);
+            what.clear();
         }
-        else if (what.rfind("typex:", 0) == 0)
-        {
-            setenv("KT_KEYBOARD_TEXT", what.c_str() + 6, 1);
-            what = "cross"; // on a tile that opens the keyboard
-        }
-        app.update(what.empty() ? hui::InputFrame{} : press(what), kDt);
+        app.update(what.empty() ? hui::InputFrame{} : press(what), hui::kt::hid::read(), kDt);
         const int frames = static_cast<int>(step.settle * 60.0f);
         for (int i = 0; i < frames; ++i)
         {
             // real time passes too, so downloads on the worker threads can finish
             std::this_thread::sleep_for(std::chrono::microseconds(16667));
-            app.update(hui::InputFrame{}, kDt);
+            app.update(hui::InputFrame{}, hui::kt::hid::read(), kDt);
         }
         if (step.picture != nullptr)
             all = picture(step.picture) && all;

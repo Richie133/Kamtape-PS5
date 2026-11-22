@@ -11,11 +11,11 @@ adapts the following.
 | ps5-homebrew-ui kit: renderer, draw list, fonts, input, EGL display, pad, system calls | `src/gfx/`, `src/ui/`, `src/core/`, `src/platform/ps5/` (except `services.cpp`), `host/platform_host.cpp` | (C) 2026 BlackBearReloaded | GPL-3.0-or-later |
 | Flashpoint PS5: interface sounds and their synthesiser, the audio mixer, system keyboard and browser services, PC snapshot tool | `assets/audio/`, `tools/make-audio.py`, `src/kt/audio.*`, `src/platform/ps5/services.cpp`, `host/` | Richie133 | GPL-3.0-or-later |
 | PayLoader: JSON reader, PNG texture loader, job worker | `src/kt/json.*`, `src/gfx/image.*`, `src/kt/worker.*` (namespace renamed) | Marice and PayLoader contributors | GPL-3.0-or-later |
-| Flashpoint PS5: the image cache the thumbnail cache is adapted from | `src/kt/thumbs.*` | Richie133 | GPL-3.0-or-later |
+| Flashpoint PS5: the image cache the thumbnail cache is adapted from, the on-screen keyboard's layout and controls, USB keyboard input | `src/kt/thumbs.*`, `src/kt/osk.*`, `src/kt/hid*`, `src/platform/ps5/hid.cpp`, `host/hid_host.cpp` | Richie133 | GPL-3.0-or-later |
 | ps5-native-app-boilerplate: libcurl support for native titles (console stand-ins, certificate list, non-blocking sockets, DNS) | `src/platform/ps5/console_curl.*` | (C) 2026 BlackBearReloaded | GPL-3.0-or-later |
 | SponsorBlock for PS5 (ytps5): the DNS query builder `console_curl.c` uses | `src/kt/dns.*` | SponsorBlock for PS5 contributors | GPL-3.0-or-later |
 | offact: the `sceImeDialog` parameter layout | `src/platform/ps5/services.cpp` | ps5-payload-dev | GPL-3.0 |
-| Ruffle Flash PS5: the touchpad data offset and the `sceAudioOut` parameters | `src/platform/ps5/pad.cpp` (touch fields), `src/platform/ps5/audio_out.cpp` | ZiZc3 and Ruffle Flash PS5 contributors | GPL-3.0 |
+| Ruffle Flash PS5: the touchpad data offset, the `sceAudioOut` parameters, loading `libSceKeyboard` by its sysmodule ID | `src/platform/ps5/pad.cpp` (touch fields), `src/platform/ps5/audio_out.cpp`, `src/platform/ps5/hid.cpp` | ZiZc3 and Ruffle Flash PS5 contributors | GPL-3.0 |
 | stb_image (PNG, JPEG and GIF decoders enabled) | `src/third_party/stb/` | Sean Barrett and contributors | Public domain or MIT (`src/third_party/stb/LICENSE`) |
 | stb_image_write (PC snapshot tool only, not in the PS5 app) | `host/third_party/stb_image_write.h` | Sean Barrett and contributors | Public domain or MIT |
 | Shape shader distance functions | `src/gfx/gl_batch.cpp` | Inigo Quilez | MIT |

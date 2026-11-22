@@ -21,16 +21,21 @@ This is an unofficial app. It is not made or endorsed by KamTape.
   off), or with ✕ on the big tile.
 - **Featured videos**: KamTape's featured list as a grid of thumbnails, with each
   video's length, author and views.
-- **Search by tag** (or △ almost anywhere): type a tag with the system keyboard.
-  More results load as you scroll.
+- **Search by tag** (or △ almost anywhere): type a tag on the KamTape keyboard.
+  More results load as you scroll, and your last five searches are one press away.
 - **Video details**: the picture, description, rating, upload date, tags, channels
   and the first comments. From there: **Watch** opens the video's page in the
   browser, **More from** lists the author's videos, and each tag starts a search.
   □ watches straight from a list too.
 - **Go to a page**: any KamTape address, such as `kamtape.com/xl/` or a video link.
   Only KamTape pages open here. The last five stay under **Recent pages**.
-- **Settings** (or OPTIONS): open XL at start, interface sound volume, clear recent
-  pages.
+- **The KamTape keyboard**: the app's own on-screen keyboard, made for the
+  controller, with a text cursor and your recent searches or pages above the keys.
+  A **USB keyboard** plugged into the PS5 types into it too, and moves around the
+  app with the arrow keys, Enter and Escape; typing a letter on the home screen
+  starts a search. Prefer the PS5's own keyboard? Switch it in Settings.
+- **Settings** (or OPTIONS): open XL at start, which keyboard, the USB keyboard,
+  interface sound volume, clear recent pages and searches.
 
 Close the browser to come back to the app. In the browser, move the pointer with the
 left stick and press ✕ to click.
@@ -40,6 +45,8 @@ left stick and press ✕ to click.
 ![Details](docs/media/details.png)
 
 ![Search by tag](docs/media/tag-search.png)
+
+![The KamTape keyboard](docs/media/keyboard.png)
 
 ## What you need
 
@@ -65,6 +72,18 @@ left stick and press ✕ to click.
 | Settings | OPTIONS |
 | Back | ○ |
 
+On the KamTape keyboard:
+
+| | Controller | USB keyboard |
+|---|---|---|
+| Type the focused key | ✕ | any key |
+| Delete | □ | Backspace, Delete |
+| Space (`/` on Go to a page) | △ | Space |
+| Move the cursor | L1, R1 (L2: to the start) | ←, →, Home, End |
+| Caps | L3 | Shift |
+| Done | OPTIONS or R2 | Enter |
+| Cancel | ○ | Escape |
+
 ## How it works
 
 The app is a native title (`eboot.bin`, `sce_sys/`) with its own OpenGL interface,
@@ -82,8 +101,12 @@ built on the same native-app tooling as
   background threads.
 - **Watching** opens the video's page in the PS5's own web browser
   (`sceSystemServiceLaunchWebBrowser`); the app doesn't play video itself.
-- **Text** comes from the system keyboard (`libSceImeDialog`). Settings are saved
-  in the title's own storage (`/download0/kamtape/settings.json`).
+- **Text** comes from the app's own keyboard (`src/kt/osk.cpp`), or from the system
+  keyboard (`libSceImeDialog`) when Settings asks for it. A USB keyboard is read
+  through `libSceKeyboard`, loaded by its sysmodule ID when the app starts, so a
+  console without it still runs the app; if starting it ever crashes the app, the
+  next start turns it off and says so. Settings are saved in the title's own
+  storage (`/download0/kamtape/settings.json`).
 
 ## Building
 
@@ -91,7 +114,7 @@ On Linux or WSL with clang-18, lld, Python 3 and ninja:
 
 ```sh
 make             # dist/PPSA52005/ and dist/PPSA52005.zip
-make test        # the PC tests (addresses, the XML reader, the API answers)
+make test        # the PC tests (addresses, the keyboard's text field, the XML reader, the API answers)
 make snapshots   # the app on a PC with the sample data in host/fixtures, pictures in build/snapshots
 make help        # everything else
 ```

@@ -61,7 +61,7 @@ Response get(const std::string &url, std::size_t max_bytes)
     curl_easy_setopt(easy, CURLOPT_MAXREDIRS, 5L);
     curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(easy, CURLOPT_TIMEOUT, 25L);
-    curl_easy_setopt(easy, CURLOPT_USERAGENT, "KamTapePS5/0.2.0 (PlayStation 5 homebrew; github.com/Richie133/Kamtape-PS5)");
+    curl_easy_setopt(easy, CURLOPT_USERAGENT, "KamTapePS5/0.3.0 (PlayStation 5 homebrew; github.com/Richie133/Kamtape-PS5)");
     curl_easy_setopt(easy, CURLOPT_ACCEPT_ENCODING, "");
     curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, on_write);
     curl_easy_setopt(easy, CURLOPT_WRITEDATA, &sink);

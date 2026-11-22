@@ -1,14 +1,16 @@
-## What's new in 0.2.0
+## What's new in 0.3.0
 
-- Featured videos: KamTape's featured list as a grid of thumbnails, right in the app
-- Search by tag with the system keyboard (Triangle), with more results as you scroll
-- Video details: description, rating, upload date, tags, channels and comments
-- Watch opens the video in the PS5 browser; More from lists the author's videos; each tag starts a search
-- Square watches straight from a list
-- Lists and details come from KamTape's developer API
+- The KamTape keyboard: the app's own on-screen keyboard, made for the controller, now used for Search and Go to a page
+  - A text cursor (L1/R1), Delete on Square, Space on Triangle, Caps on L3, Done on OPTIONS or R2
+  - Your last five searches (or pages) sit above the keys: one press runs them again
+  - On Go to a page, a kamtape.com/ key and Triangle types /
+- USB keyboard support: a keyboard plugged into the PS5 types into the KamTape keyboard, and moves around the app with the arrows, Enter and Escape; typing a letter on the home screen starts a search
+- Settings: choose the KamTape keyboard or the PS5 system keyboard, turn the USB keyboard on or off, clear recent searches too
+- If the PS5 system keyboard won't open, the KamTape keyboard opens instead
 
 ## Still here
 
+- Featured videos, search by tag and video details, from KamTape's developer API
 - KamTape XL opens in the PS5 browser when the app starts (can be turned off in Settings)
 - Go to a page for any KamTape address, and Recent pages
 

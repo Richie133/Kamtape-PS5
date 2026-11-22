@@ -7,6 +7,7 @@
 #include "kt/address.hpp"
 #include "kt/audio.hpp"
 #include "kt/services.hpp"
+#include "kt/style.hpp"
 #include "platform/ps5/system.hpp"
 
 #include <algorithm>
@@ -24,26 +25,12 @@ using gfx::Align;
 using gfx::Color;
 using gfx::Rect;
 
-const Color kBgTop = Color::rgb(0x1c1f29);
-const Color kBgBottom = Color::rgb(0x0b0c10);
-const Color kPanel = Color::rgb(0x191c24);
-const Color kPanelHi = Color::rgb(0x232733);
-const Color kLine = Color::rgb(0x2e3341);
-const Color kBadge = Color::rgb(0x272b37);
-const Color kText = Color::rgb(0xf4efe6);
-const Color kMuted = Color::rgb(0xa6aab6);
-const Color kDim = Color::rgb(0x6f7383);
-const Color kAccent = Color::rgb(0x6fdc3a); // KamTape green
-const Color kAccentText = Color::rgb(0xb6f19a);
-const Color kOnAccent = Color::rgb(0x0f2108);
-const Color kAmber = Color::rgb(0xffb547);
-const Color kError = Color::rgb(0xff6b5a);
+using namespace style;
 const Color kCream = Color::rgb(0xf1e8d6);
 const Color kCreamShade = Color::rgb(0xd6c8ae);
 const Color kHeroTop = Color::rgb(0x1e3a18);
 const Color kHeroBottom = Color::rgb(0x0f1a10);
 const Color kHeroLine = Color::rgb(0x31592a);
-const Color kClear{0.0f, 0.0f, 0.0f, 0.0f};
 
 constexpr float kRight = 1824.0f;
 
@@ -58,8 +45,8 @@ constexpr float kRecentH = 60.0f;
 constexpr float kRecentMaxText = 360.0f;
 
 // settings
-constexpr Rect kSettingsPanel{336.0f, 206.0f, 1248.0f, 680.0f};
-constexpr int kSettingsRows = 3;
+constexpr Rect kSettingsPanel{336.0f, 206.0f, 1248.0f, 744.0f};
+constexpr int kSettingsRows = 5;
 
 // the video grid
 constexpr int kCols = 5;
@@ -79,8 +66,8 @@ constexpr float kDetailW = kRight - kDetailX;
 
 Rect settings_row(int i)
 {
-    return {kSettingsPanel.x + 40.0f, kSettingsPanel.y + 112.0f + static_cast<float>(i) * 96.0f,
-            kSettingsPanel.w - 80.0f, 80.0f};
+    return {kSettingsPanel.x + 40.0f, kSettingsPanel.y + 104.0f + static_cast<float>(i) * 82.0f,
+            kSettingsPanel.w - 80.0f, 70.0f};
 }
 
 Rect card_thumb(int index, float scroll)
@@ -248,19 +235,95 @@ void App::open(const std::string &url, const std::string &what)
     }
 }
 
-void App::open_keyboard(Keyboard purpose)
+void App::open_keyboard(Keyboard purpose, const std::string &start)
 {
     const bool search = purpose == Keyboard::search;
-    if (services::keyboard_open(search ? "Search KamTape by tag" : "Go to a KamTape page",
-                                search ? "" : "kamtape.com/"))
+    const std::string title = search ? "Search KamTape by tag" : "Go to a KamTape page";
+    const std::string text = search ? start : (start.empty() ? "kamtape.com/" : start);
+    keyboard_ = purpose;
+    audio::play(audio::Sfx::select);
+    if (settings_.system_keyboard && services::keyboard_open(title, text))
+        return;
+    // the app's own keyboard (also when the system one won't open)
+    std::vector<std::string> suggestions;
+    if (search)
     {
-        keyboard_ = purpose;
-        audio::play(audio::Sfx::select);
+        suggestions = settings_.searches;
     }
     else
     {
-        audio::play(audio::Sfx::error);
-        show_status("The system keyboard didn't open.", true);
+        for (const std::string &url : settings_.recent)
+            suggestions.push_back(short_address(url));
+    }
+    osk_.open(title, text, search ? OnScreenKeyboard::Mode::text : OnScreenKeyboard::Mode::address,
+              std::move(suggestions));
+}
+
+bool App::begin_usb()
+{
+    if (settings_.usb_trying)
+    {
+        // the last start died while the USB keyboard was starting
+        settings_.usb_trying = false;
+        settings_.usb_input = false;
+        save();
+        show_status("USB keyboard is off: starting it failed last time. Settings turns it back on.", true);
+        return false;
+    }
+    if (!settings_.usb_input)
+        return false;
+    settings_.usb_trying = true;
+    save();
+    return true;
+}
+
+void App::end_usb(bool opened)
+{
+    (void)opened;
+    settings_.usb_trying = false;
+    save();
+}
+
+void App::usb_navigation(const hid::Frame &usb, InputFrame &input)
+{
+    const auto press = [&](Action a) { input.pressed |= action_bit(a); };
+    for (std::uint16_t key : usb.pressed)
+    {
+        switch (key)
+        {
+        case hid::key::kUp:
+            input.nav = Direction::up;
+            break;
+        case hid::key::kDown:
+            input.nav = Direction::down;
+            break;
+        case hid::key::kLeft:
+            input.nav = Direction::left;
+            break;
+        case hid::key::kRight:
+            input.nav = Direction::right;
+            break;
+        case hid::key::kEnter:
+            press(Action::confirm);
+            break;
+        case hid::key::kEscape:
+        case hid::key::kBackspace:
+            press(Action::back);
+            break;
+        case hid::key::kTab:
+            press(Action::menu);
+            break;
+        default:
+            break;
+        }
+    }
+    // typing a letter starts a tag search with it
+    const Screen now = screen();
+    if ((now == Screen::home || now == Screen::videos) && !usb.text.empty())
+    {
+        const char c = usb.text.front();
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
+            open_keyboard(Keyboard::search, std::string(1, c));
     }
 }
 
@@ -272,7 +335,11 @@ void App::finish_keyboard(const std::string &text)
     {
         const std::string tag = trimmed(text);
         if (!tag.empty())
+        {
+            settings_.remember_search(tag);
+            save();
             push_list(ListKind::tag, tag);
+        }
         return;
     }
     const Address address = normalize_address(text);
@@ -377,6 +444,25 @@ void App::update_settings(const InputFrame &input)
         }
         break;
     case 1:
+        if (confirm || left || right)
+        {
+            settings_.system_keyboard = !settings_.system_keyboard;
+            save();
+            audio::play(audio::Sfx::select);
+        }
+        break;
+    case 2:
+        if (confirm || left || right)
+        {
+            settings_.usb_input = !settings_.usb_input;
+            save();
+            audio::play(audio::Sfx::select);
+            show_status(settings_.usb_input ? "The USB keyboard starts next time the app opens."
+                                            : "The USB keyboard is off from the next start.",
+                        false);
+        }
+        break;
+    case 3:
     {
         int level = settings_.sounds;
         if (left)
@@ -394,21 +480,22 @@ void App::update_settings(const InputFrame &input)
         }
         break;
     }
-    case 2:
+    case 4:
         if (confirm)
         {
-            if (settings_.recent.empty())
+            if (settings_.recent.empty() && settings_.searches.empty())
             {
                 audio::play(audio::Sfx::error);
-                show_status("There are no recent pages to clear.", false);
+                show_status("There is nothing to clear.", false);
             }
             else
             {
                 settings_.recent.clear();
+                settings_.searches.clear();
                 save();
                 layout_home();
                 audio::play(audio::Sfx::select);
-                show_status("Recent pages cleared.", false);
+                show_status("Recent pages and searches cleared.", false);
             }
         }
         break;
@@ -746,7 +833,7 @@ Rect App::focus_target() const
     return screen_ == Screen::home ? items_[static_cast<std::size_t>(focus_)].rect : settings_row(settings_focus_);
 }
 
-void App::update(const InputFrame &input, float dt)
+void App::update(const InputFrame &pad_input, const hid::Frame &usb, float dt)
 {
     time_ += dt;
     screen_time_ += dt;
@@ -761,8 +848,24 @@ void App::update(const InputFrame &input, float dt)
             page.scroll = static_cast<float>(page.top_row);
     }
 
+    InputFrame input = pad_input;
     bool typing = false;
-    if (keyboard_ != Keyboard::none)
+    if (osk_.is_open())
+    {
+        typing = true; // the on-screen keyboard has the controller
+        switch (osk_.update(input, usb, dt))
+        {
+        case OnScreenKeyboard::Result::done:
+            finish_keyboard(osk_.text());
+            break;
+        case OnScreenKeyboard::Result::cancelled:
+            keyboard_ = Keyboard::none;
+            break;
+        case OnScreenKeyboard::Result::none:
+            break;
+        }
+    }
+    else if (keyboard_ != Keyboard::none)
     {
         std::string text;
         switch (services::keyboard_poll(&text))
@@ -788,7 +891,9 @@ void App::update(const InputFrame &input, float dt)
             open(kXlUrl, "KamTape XL");
     }
 
-    if (!typing)
+    if (!typing && keyboard_ == Keyboard::none)
+        usb_navigation(usb, input);
+    if (!typing && keyboard_ == Keyboard::none)
     {
         if (!pages_.empty())
         {
@@ -1189,6 +1294,13 @@ void App::draw_settings(gfx::DrawList &list) const
     ui::text(list, fonts_.bold, "Settings", p.x + 40, p.y + 74, 46, kText);
 
     draw_focus(list, focus_rect_, 18.0f);
+    const auto toggle = [&](const Rect &r, bool on, const char *on_label, const char *off_label) {
+        const float right = r.x + r.w - 32;
+        const Rect sw{right - 84, r.cy() - 20, 84, 40};
+        list.rounded_rect(sw, 20, on ? kAccent : Color::rgb(0x3a3f4c));
+        list.circle(on ? sw.x + sw.w - 20 : sw.x + 20, r.cy(), 14, kText);
+        ui::text(list, fonts_.regular, on ? on_label : off_label, sw.x - 18, r.cy() + 10, 26, kMuted, Align::right);
+    };
     for (int i = 0; i < kSettingsRows; ++i)
     {
         const Rect r = settings_row(i);
@@ -1196,35 +1308,43 @@ void App::draw_settings(gfx::DrawList &list) const
         list.rounded_rect(r, 18, focused ? kPanelHi : Color::rgb(0x1e212b));
         const float cy = r.cy();
         const float right = r.x + r.w - 32;
+        const auto label = [&](const char *text) { ui::text(list, fonts_.bold, text, r.x + 32, cy + 10, 28, kText); };
         switch (i)
         {
         case 0:
-        {
-            ui::text(list, fonts_.bold, "Open KamTape XL when the app starts", r.x + 32, cy + 11, 30, kText);
-            const bool on = settings_.open_xl_on_start;
-            const Rect sw{right - 92, cy - 22, 92, 44};
-            list.rounded_rect(sw, 22, on ? kAccent : Color::rgb(0x3a3f4c));
-            list.circle(on ? sw.x + sw.w - 22 : sw.x + 22, cy, 16, kText);
-            ui::text(list, fonts_.regular, on ? "On" : "Off", sw.x - 18, cy + 10, 28, kMuted, Align::right);
+            label("Open KamTape XL when the app starts");
+            toggle(r, settings_.open_xl_on_start, "On", "Off");
             break;
-        }
         case 1:
         {
-            ui::text(list, fonts_.bold, "Interface sounds", r.x + 32, cy + 11, 30, kText);
-            const char *name = kSoundNames[std::clamp(settings_.sounds, 0, 3)];
-            const float w = 170;
-            list.triangle({right - 18, cy - 10, 18, 20}, settings_.sounds < 3 ? kText : kDim, 0.0f, 1.5708f);
-            list.triangle({right - w - 18, cy - 10, 18, 20}, settings_.sounds > 0 ? kText : kDim, 0.0f, -1.5708f);
-            ui::text(list, fonts_.regular, name, right - 9 - w / 2 - 9, cy + 10, 28, kText, Align::center);
+            label("Keyboard");
+            const char *name = settings_.system_keyboard ? "PS5 system keyboard" : "KamTape keyboard";
+            const float w = fonts_.regular.measure(name, 26) + 56;
+            list.triangle({right - 16, cy - 9, 16, 18}, kText, 0.0f, 1.5708f);
+            list.triangle({right - w - 16, cy - 9, 16, 18}, kText, 0.0f, -1.5708f);
+            ui::text(list, fonts_.regular, name, right - 8 - w / 2, cy + 9, 26, kText, Align::center);
             break;
         }
         case 2:
+            label("USB keyboard");
+            toggle(r, settings_.usb_input, "On", "Off");
+            break;
+        case 3:
         {
-            ui::text(list, fonts_.bold, "Clear recent pages", r.x + 32, cy + 11, 30, kText);
-            const int n = static_cast<int>(settings_.recent.size());
-            const std::string value =
-                n == 0 ? "None saved" : (std::to_string(n) + (n == 1 ? " page" : " pages"));
-            ui::text(list, fonts_.regular, value, right, cy + 10, 28, kMuted, Align::right);
+            label("Interface sounds");
+            const char *name = kSoundNames[std::clamp(settings_.sounds, 0, 3)];
+            const float w = 170;
+            list.triangle({right - 16, cy - 9, 16, 18}, settings_.sounds < 3 ? kText : kDim, 0.0f, 1.5708f);
+            list.triangle({right - w - 16, cy - 9, 16, 18}, settings_.sounds > 0 ? kText : kDim, 0.0f, -1.5708f);
+            ui::text(list, fonts_.regular, name, right - 8 - w / 2 - 8, cy + 9, 26, kText, Align::center);
+            break;
+        }
+        case 4:
+        {
+            label("Clear recent pages and searches");
+            const int n = static_cast<int>(settings_.recent.size() + settings_.searches.size());
+            const std::string value = n == 0 ? "None saved" : (std::to_string(n) + " saved");
+            ui::text(list, fonts_.regular, value, right, cy + 9, 26, kMuted, Align::right);
             break;
         }
         default:
@@ -1232,21 +1352,17 @@ void App::draw_settings(gfx::DrawList &list) const
         }
     }
 
-    float y = settings_row(kSettingsRows - 1).y + 80 + 70;
+    float y = settings_row(kSettingsRows - 1).y + 70 + 58;
     ui::text(list, fonts_.bold, "ABOUT", p.x + 40, y, 18, kDim, Align::left, 3);
-    y += 44;
+    y += 42;
     const float w = p.w - 80;
     y = ui::paragraph(list, fonts_.regular,
                       std::string("KamTape for PS5 ") + kVersion +
                           ". An unofficial app, not made or endorsed by KamTape. Lists and details come from "
                           "KamTape's developer API.",
-                      p.x + 40, y, 26, w, 38, kText);
-    y = ui::paragraph(list, fonts_.regular,
-                      "In the browser, move the pointer with the left stick and press Cross to click. "
-                      "Close the browser to come back here.",
-                      p.x + 40, y + 6, 26, w, 38, kMuted);
+                      p.x + 40, y, 24, w, 34, kText);
     ui::paragraph(list, fonts_.regular, std::string("Source code and licence (GPL-3.0): ") + kSourceUrl, p.x + 40,
-                  y + 6, 26, w, 38, kMuted);
+                  y + 4, 24, w, 34, kMuted);
     list.pop_transform();
     list.pop_opacity();
 }
@@ -1451,7 +1567,7 @@ void App::draw_footer(gfx::DrawList &list) const
         draw_hint(list, "OPTIONS", "Settings", x, cy);
         break;
     case Screen::settings:
-        x = draw_hint(list, "cross", settings_focus_ == 2 ? "Clear" : "Change", x, cy);
+        x = draw_hint(list, "cross", settings_focus_ == 4 ? "Clear" : "Change", x, cy);
         draw_hint(list, "circle", "Back", x, cy);
         break;
     case Screen::videos:
@@ -1518,6 +1634,7 @@ void App::draw(gfx::DrawList &list) const
         draw_settings(list);
     }
     draw_footer(list);
+    osk_.draw(list, fonts_.regular, fonts_.bold);
     draw_status(list);
 }
 
