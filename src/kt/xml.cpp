@@ -327,6 +327,8 @@ std::string XmlNode::attribute(std::string_view wanted) const
 
 std::unique_ptr<XmlNode> parse_xml(std::string_view text)
 {
+    if (text.size() >= 3 && text.compare(0, 3, "\xEF\xBB\xBF") == 0)
+        text.remove_prefix(3); // a UTF-8 byte-order mark
     return Parser(text).document();
 }
 

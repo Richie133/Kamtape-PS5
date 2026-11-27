@@ -83,7 +83,7 @@ int main()
     kt::audio::init(kAssets);
 
     kt::App app(fonts, logo, logo_h > 0 ? static_cast<float>(logo_w) / static_cast<float>(logo_h) : 1.0f,
-                kSettingsDir);
+                kSettingsDir, "/app0/sce_sys/param.json");
 
     gfx::DrawList list;
     bool usb_open = false;

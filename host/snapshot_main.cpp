@@ -123,6 +123,26 @@ const Step kTour[] = {
     {"usb:watch?v=dQw4w9WgXcQ\n", 4.5f, nullptr},
     {"options", 1.2f, "16-settings"},
     {"circle", 1.2f, "17-back-home"},
+    // the updater: a sample release turns up, the first try finds no payload loader, the second installs
+    {"env:KT_NO_UPDATE=", 0.0f, nullptr},
+    {"options", 0.4f, nullptr},
+    {"down", 0.1f, nullptr},
+    {"down", 0.1f, nullptr},
+    {"down", 0.1f, nullptr},
+    {"down", 0.1f, nullptr},
+    {"down", 0.3f, nullptr},
+    {"cross", 1.2f, "18-update-available"},
+    {"env:KT_UPDATE_NO_LOADER=1", 0.0f, nullptr},
+    {"cross", 1.0f, "19-update-failed"},
+    {"env:KT_UPDATE_NO_LOADER=", 0.0f, nullptr},
+    {"right", 0.1f, nullptr},
+    {"right", 0.1f, nullptr},
+    {"cross", 0.5f, nullptr}, // Close
+    {"cross", 0.5f, nullptr}, // Settings > Updates opens it again
+    {"cross", 0.2f, nullptr}, // Update now ...
+    {"circle", 1.0f, "20-update-cancelled"}, // ... and Cancel
+    {"cross", 0.25f, "21-update-downloading"},
+    {"", 1.1f, "22-update-restarting"},
 };
 
 hui::InputFrame press(const std::string &n)
@@ -199,8 +219,9 @@ int main(int argc, char **argv)
     const std::uint32_t logo = hui::gfx::load_png_texture(assets + "/logo.png", &logo_w, &logo_h);
     hui::kt::services::init();
     hui::kt::audio::init(assets);
+    setenv("KT_NO_UPDATE", "1", 1); // the update screens come at the end of the tour
     hui::kt::App app(fonts, logo, logo_h > 0 ? static_cast<float>(logo_w) / static_cast<float>(logo_h) : 1.0f,
-                     output);
+                     output, assets + "/../sce_sys/param.json");
 
     hui::gfx::DrawList list;
     std::vector<unsigned char> pixels(static_cast<std::size_t>(width) * height * 4);
@@ -246,9 +267,10 @@ int main(int argc, char **argv)
             typed.keyboard = true;
             for (char c : what.substr(4))
             {
-                if (c == '\n')
-                    typed.pressed.push_back(hui::kt::hid::key::kEnter);
-                else
+                // the usage doesn't matter to the app for a typed character: 0x04 stands in
+                typed.pressed.push_back(c == '\n' ? hui::kt::hid::key::kEnter : std::uint16_t{0x04});
+                typed.typed.push_back(c == '\n' ? 0 : c);
+                if (c != '\n')
                     typed.text.push_back(c);
             }
             hui::kt::hid::hid_host_push(typed);

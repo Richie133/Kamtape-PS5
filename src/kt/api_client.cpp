@@ -19,7 +19,8 @@ int ApiClient::fetch(const std::string &url)
     worker_.queue([this, ticket, url] {
         http::Response response = http::get(url, 2u << 20);
         std::lock_guard<std::mutex> lock(mutex_);
-        done_[ticket] = std::move(response);
+        if (forgotten_.erase(ticket) == 0)
+            done_[ticket] = std::move(response);
         --pending_;
     });
     return ticket;
@@ -34,6 +35,15 @@ bool ApiClient::take(int ticket, http::Response *response)
     *response = std::move(it->second);
     done_.erase(it);
     return true;
+}
+
+void ApiClient::forget(int ticket)
+{
+    if (ticket == 0)
+        return;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (done_.erase(ticket) == 0)
+        forgotten_.insert(ticket);
 }
 
 bool ApiClient::busy() const

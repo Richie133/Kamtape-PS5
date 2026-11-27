@@ -14,6 +14,9 @@ adapts the following.
 | Flashpoint PS5: the image cache the thumbnail cache is adapted from, the on-screen keyboard's layout and controls, USB keyboard input | `src/kt/thumbs.*`, `src/kt/osk.*`, `src/kt/hid*`, `src/platform/ps5/hid.cpp`, `host/hid_host.cpp` | Richie133 | GPL-3.0-or-later |
 | ps5-native-app-boilerplate: libcurl support for native titles (console stand-ins, certificate list, non-blocking sockets, DNS) | `src/platform/ps5/console_curl.*` | (C) 2026 BlackBearReloaded | GPL-3.0-or-later |
 | SponsorBlock for PS5 (ytps5): the DNS query builder `console_curl.c` uses | `src/kt/dns.*` | SponsorBlock for PS5 contributors | GPL-3.0-or-later |
+| ps5-native-app-boilerplate: the update check and self-update kit (ProsperoEden's and ProsperoRadio's copy; KamTape PS5 adds GitHub's older release file host to the allowed redirects) | `src/third_party/update_check/`, `src/platform/ps5/self_update_ps5.c` | (C) 2026 BlackBearReloaded | GPL-3.0-or-later |
+| ps5-native-app-boilerplate: the self-update helper payload, `self-updater.elf` (with ProsperoEden's changes, as ProsperoRadio carries it) | `third_party/self_update_helper/` | (C) 2026 BlackBearReloaded | GPL-3.0-or-later |
+| ps5-native-app-boilerplate: the loader-ELF check | `tools/validate-loader-elf.py` | (C) 2026 BlackBearReloaded | GPL-3.0-or-later |
 | offact: the `sceImeDialog` parameter layout | `src/platform/ps5/services.cpp` | ps5-payload-dev | GPL-3.0 |
 | Ruffle Flash PS5: the touchpad data offset, the `sceAudioOut` parameters, loading `libSceKeyboard` by its sysmodule ID | `src/platform/ps5/pad.cpp` (touch fields), `src/platform/ps5/audio_out.cpp`, `src/platform/ps5/hid.cpp` | ZiZc3 and Ruffle Flash PS5 contributors | GPL-3.0 |
 | stb_image (PNG, JPEG and GIF decoders enabled) | `src/third_party/stb/` | Sean Barrett and contributors | Public domain or MIT (`src/third_party/stb/LICENSE`) |
@@ -26,6 +29,12 @@ The PS5 app statically links [ps5-opengl](https://github.com/darkxex/ps5-opengl)
 (Apache-2.0) and their dependencies (zlib, zstd, libpsl), under those projects'
 licences. `make` downloads them into `.deps/`; they are not stored in this
 repository.
+
+## miniz (`third_party/miniz/`)
+
+The ZIP reader inside `self-updater.elf`. miniz 3.0.2, MIT
+(`third_party/miniz/LICENSE`, also shipped as `licenses/miniz-MIT.txt` in the
+app folder).
 
 ## Mozilla CA certificate store (`src/third_party/mozilla/ca_bundle.c`)
 

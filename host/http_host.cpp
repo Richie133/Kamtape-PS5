@@ -29,6 +29,8 @@ Response get(const std::string &url, std::size_t max_bytes)
     const std::size_t still = url.find("get_still?video_id=");
     if (still != std::string::npos)
         file = "thumbs/" + url.substr(still + 19) + ".jpg";
+    else if (url.rfind("https://api.github.com/repos/", 0) == 0)
+        file = std::getenv("KT_NO_UPDATE") != nullptr ? "releases-none.json" : "releases.json";
     else if (std::getenv("KT_FIXTURE_FAIL") != nullptr && url.find("method=") != std::string::npos)
         file = "fail.xml";
     else if (url.find("method=kamtape.videos.list_featured") != std::string::npos)

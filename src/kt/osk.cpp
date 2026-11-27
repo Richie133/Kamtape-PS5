@@ -225,10 +225,25 @@ OnScreenKeyboard::Result OnScreenKeyboard::update(const InputFrame &input, const
         return Result::none;
     time_ += dt;
 
-    // a USB keyboard types straight into the field
-    for (std::uint16_t key : usb.pressed)
+    // a USB keyboard types straight into the field, keys and characters in the order they came
+    const bool ordered = usb.typed.size() == usb.pressed.size();
+    if (!ordered)
     {
-        switch (key)
+        for (char c : usb.text)
+        {
+            if (c >= 32 && c < 127)
+                field_.insert(std::string(1, c));
+        }
+    }
+    for (std::size_t i = 0; i < usb.pressed.size(); ++i)
+    {
+        const char c = ordered ? usb.typed[i] : 0;
+        if (c >= 32 && c < 127)
+        {
+            field_.insert(std::string(1, c));
+            continue;
+        }
+        switch (usb.pressed[i])
         {
         case hid::key::kEnter:
             return finish(Result::done);
@@ -255,11 +270,6 @@ OnScreenKeyboard::Result OnScreenKeyboard::update(const InputFrame &input, const
         default:
             break;
         }
-    }
-    for (char c : usb.text)
-    {
-        if (c >= 32 && c < 127)
-            field_.insert(std::string(1, c));
     }
 
     // the controller

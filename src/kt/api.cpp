@@ -95,7 +95,8 @@ const XmlNode *payload(const XmlNode *root, const char *wanted, ApiError *error)
         return root;
     if (root->name == "ut_response")
     {
-        if (root->attribute("status") != "ok")
+        const std::string status = root->attribute("status");
+        if (status == "fail" || (status != "ok" && root->child("error") != nullptr))
         {
             error->failed = true;
             const XmlNode *e = root->child("error");

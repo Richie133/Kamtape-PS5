@@ -89,13 +89,16 @@ jobs:
           TAG: ${{ steps.target.outputs.tag }}
         run: |
           sha=$(sha256sum dist/PPSA52005.zip | cut -d ' ' -f 1)
+          version=$(python3 -c 'import json; print(json.load(open("sce_sys/param.json"))["contentVersion"])')
+          # the app's updater reads both lines (src/kt/release.cpp): keep their wording
           line="\`PPSA52005.zip\` sha256: \`$sha\`"
+          line2="contentVersion: \`$version\`"
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             # a new release: from this commit, a pre-release for alpha/beta/rc tags
             pre=()
             shopt -s nocasematch
             [[ $TAG == *alpha* || $TAG == *beta* || $TAG == *rc* ]] && pre=(--prerelease)
-            { cat .github/release-notes.md; printf '\n%s\n' "$line"; } > notes.md
+            { cat .github/release-notes.md; printf '\n%s\n%s\n' "$line" "$line2"; } > notes.md
             gh release create "$TAG" dist/PPSA52005.zip --repo "$GITHUB_REPOSITORY" "${pre[@]}" \
               --verify-tag --title "KamTape for PS5 ${TAG#v}" --notes-file notes.md 2>/dev/null ||
             gh release create "$TAG" dist/PPSA52005.zip --repo "$GITHUB_REPOSITORY" "${pre[@]}" \
@@ -104,13 +107,14 @@ jobs:
             gh release upload "$TAG" dist/PPSA52005.zip --clobber --repo "$GITHUB_REPOSITORY"
             # keep the release's own title and notes; replace an older digest line
             gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > body.md
-            python3 - "$line" <<'PY'
+            python3 - "$line" "$line2" <<'PY'
           import sys
           kept = [l for l in open("body.md").read().splitlines()
-                  if not l.startswith("`PPSA52005.zip` sha256:")]
+                  if not l.startswith("`PPSA52005.zip` sha256:") and not l.startswith("contentVersion:")]
           text = "\n".join(kept).rstrip()
-          open("notes.md", "w").write((text + "\n\n" if text else "") + sys.argv[1] + "\n")
+          open("notes.md", "w").write((text + "\n\n" if text else "") + sys.argv[1] + "\n" + sys.argv[2] + "\n")
           PY
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
           fi
           echo "$line"
+          echo "$line2"

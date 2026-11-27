@@ -46,7 +46,7 @@ constexpr float kRecentMaxText = 360.0f;
 
 // settings
 constexpr Rect kSettingsPanel{336.0f, 206.0f, 1248.0f, 744.0f};
-constexpr int kSettingsRows = 5;
+constexpr int kSettingsRows = 6;
 
 // the video grid
 constexpr int kCols = 5;
@@ -114,9 +114,11 @@ std::string views_label(long long views)
 
 } // namespace
 
-App::App(const Fonts &fonts, std::uint32_t logo, float logo_aspect, std::string settings_dir)
+App::App(const Fonts &fonts, std::uint32_t logo, float logo_aspect, std::string settings_dir,
+         std::string param_path)
     : fonts_(fonts), logo_(logo), logo_aspect_(logo_aspect), settings_dir_(std::move(settings_dir)),
-      thumbs_(std::make_unique<Thumbs>()), api_(std::make_unique<ApiClient>())
+      thumbs_(std::make_unique<Thumbs>()), api_(std::make_unique<ApiClient>()),
+      updater_(std::make_unique<Updater>(std::move(param_path)))
 {
     settings_ = Settings::load(settings_dir_ + "/settings.json");
     api_configure(settings_dir_);
@@ -480,6 +482,23 @@ void App::update_settings(const InputFrame &input)
         }
         break;
     }
+    case 5:
+        if (confirm)
+        {
+            if (update_state_ == Updater::State::available)
+            {
+                audio::play(audio::Sfx::select);
+                dialog_ = true;
+                dialog_button_ = 0;
+                dialog_time_ = 0.0f;
+            }
+            else if (update_state_ != Updater::State::checking)
+            {
+                audio::play(audio::Sfx::select);
+                check_updates(true);
+            }
+        }
+        break;
     case 4:
         if (confirm)
         {
@@ -566,6 +585,14 @@ void App::push_details(const Video &video)
     focus_snapped_ = false;
 }
 
+void App::pop_page()
+{
+    audio::play(audio::Sfx::back);
+    api_->forget(pages_.back().ticket); // an answer still on its way has nobody to go to
+    pages_.pop_back();
+    focus_snapped_ = false;
+}
+
 // Picks up the answer to a page's request, if it has come back.
 void App::collect(Page &page)
 {
@@ -587,10 +614,20 @@ void App::collect(Page &page)
         // an API error can come with a failing status: say what it says
         std::vector<Video> ignored;
         const ApiError api = parse_video_list(response.body, &ignored);
-        page.error = api.failed && api.message.rfind("KamTape: ", 0) == 0
-                         ? api.message
-                         : "Couldn't reach KamTape (" + why + ").";
-        sys::log("[KT] list failed: %s", page.error.c_str());
+        const std::string message = api.failed && api.message.rfind("KamTape: ", 0) == 0
+                                        ? api.message
+                                        : "Couldn't reach KamTape (" + why + ").";
+        sys::log("[KT] list failed: %s", message.c_str());
+        if (page.videos.empty())
+        {
+            page.error = message;
+        }
+        else
+        {
+            // the first videos are there: keep them, try the next page again a little later
+            page.retry_at = time_ + 5.0f;
+            show_status("Couldn't load more videos. " + message, true);
+        }
         return;
     }
     if (page.screen == Screen::details)
@@ -640,8 +677,16 @@ void App::collect(Page &page)
     const ApiError error = parse_video_list(response.body, &videos);
     if (error.failed)
     {
-        page.error = error.message;
-        sys::log("[KT] list failed: %s", page.error.c_str());
+        sys::log("[KT] list failed: %s", error.message.c_str());
+        if (page.videos.empty())
+        {
+            page.error = error.message;
+        }
+        else
+        {
+            page.retry_at = time_ + 5.0f;
+            show_status("Couldn't load more videos. " + error.message, true);
+        }
         return;
     }
     page.more = page.list == ListKind::tag && static_cast<int>(videos.size()) >= kPerPage;
@@ -655,9 +700,7 @@ void App::update_videos(Page &page, const InputFrame &input)
     const int count = static_cast<int>(page.videos.size());
     if (input.is_pressed(Action::back))
     {
-        audio::play(audio::Sfx::back);
-        pages_.pop_back();
-        focus_snapped_ = false;
+        pop_page();
         return;
     }
     if (input.is_pressed(Action::north))
@@ -709,7 +752,8 @@ void App::update_videos(Page &page, const InputFrame &input)
     else if (row > page.top_row + 1)
         page.top_row = row - 1;
     // near the end of a tag search: ask for the next page
-    if (page.more && page.ticket == 0 && page.error.empty() && row >= (count - 1) / kCols - 1)
+    if (page.more && page.ticket == 0 && page.error.empty() && time_ >= page.retry_at &&
+        row >= (count - 1) / kCols - 1)
         load_more(page);
 
     const Video video = page.videos[static_cast<std::size_t>(page.focus)]; // pages_ may grow below
@@ -773,9 +817,7 @@ void App::update_details(Page &page, const InputFrame &input)
 {
     if (input.is_pressed(Action::back))
     {
-        audio::play(audio::Sfx::back);
-        pages_.pop_back();
-        focus_snapped_ = false;
+        pop_page();
         return;
     }
     const std::vector<Choice> actions = details_choices(page);
@@ -848,9 +890,21 @@ void App::update(const InputFrame &pad_input, const hid::Frame &usb, float dt)
             page.scroll = static_cast<float>(page.top_row);
     }
 
+    watch_updates();
+    if (!update_checked_ && time_ >= 4.0f)
+        check_updates(false); // once per launch, after KamTape XL has had its turn
+    if (quit_at_ >= 0.0f && time_ >= quit_at_)
+        sys::quit(); // the helper puts the new version in place once the app is gone
+
     InputFrame input = pad_input;
     bool typing = false;
-    if (osk_.is_open())
+    if (dialog_)
+    {
+        dialog_time_ += dt;
+        update_dialog(input);
+        typing = true; // the dialog has the controller
+    }
+    else if (osk_.is_open())
     {
         typing = true; // the on-screen keyboard has the controller
         switch (osk_.update(input, usb, dt))
@@ -960,6 +1014,320 @@ bool App::idle() const
     const bool settled = std::fabs(target.x - focus_rect_.x) < 0.5f &&
                          std::fabs(target.y - focus_rect_.y) < 0.5f && std::fabs(target.w - focus_rect_.w) < 0.5f;
     return time_ > 1.6f && screen_time_ > 0.9f && settled && !api_->busy();
+}
+
+// ---- updates --------------------------------------------------------------------------
+
+void App::check_updates(bool asked)
+{
+    update_checked_ = true;
+    check_asked_ = asked;
+    if (asked)
+        show_status("Checking GitHub for a new version...", false);
+    updater_->check();
+}
+
+// Follows the check and the install; opens the dialog when an update turns up.
+void App::watch_updates()
+{
+    const Updater::State state = updater_->state();
+    if (state != update_state_)
+    {
+        update_state_ = state;
+        if (state != Updater::State::checking && status_.rfind("Checking GitHub", 0) == 0)
+            status_time_ = -10.0f; // the answer replaces "Checking..."
+        switch (state)
+        {
+        case Updater::State::available:
+            update_release_ = updater_->release();
+            if (check_asked_ || (!dialog_dismissed_ && screen() == Screen::home && !osk_.is_open() &&
+                                 keyboard_ == Keyboard::none))
+            {
+                dialog_ = true;
+                dialog_button_ = 0;
+                dialog_time_ = 0.0f;
+                audio::play(audio::Sfx::open);
+            }
+            break;
+        case Updater::State::up_to_date:
+            if (check_asked_)
+                show_status(std::string(kAppName) + " is up to date.", false);
+            break;
+        case Updater::State::unknown:
+            if (check_asked_)
+                show_status("Couldn't check for updates: " + updater_->why() + ".", true);
+            break;
+        default:
+            break;
+        }
+        if (state != Updater::State::checking && state != Updater::State::idle)
+            check_asked_ = false;
+    }
+    // an update found while the user was elsewhere waits for the home screen
+    if (update_state_ == Updater::State::available && !dialog_ && !dialog_dismissed_ && screen() == Screen::home &&
+        !osk_.is_open() && keyboard_ == Keyboard::none && time_ > 2.0f)
+    {
+        dialog_ = true;
+        dialog_button_ = 0;
+        dialog_time_ = 0.0f;
+    }
+
+    const self_update_phase before = install_.phase;
+    install_ = updater_->poll();
+    if (install_.phase == SELF_UPDATE_READY && quit_at_ < 0.0f)
+    {
+        // staged and checked: go ahead, then close so the helper can swap the files
+        if (updater_->apply())
+        {
+            install_ = updater_->poll();
+            quit_at_ = time_ + 1.8f;
+            audio::play(audio::Sfx::select);
+        }
+        else
+        {
+            install_ = updater_->poll();
+        }
+    }
+    if (install_.phase != before)
+    {
+        if (install_.phase == SELF_UPDATE_FAILED)
+        {
+            audio::play(audio::Sfx::error);
+            dialog_button_ = 0;
+        }
+        else if (install_.phase == SELF_UPDATE_CANCELLED)
+        {
+            show_status("Update cancelled. Nothing was changed.", false);
+            install_ = self_update_status{};
+            dialog_button_ = 0;
+        }
+    }
+}
+
+std::vector<std::string> App::dialog_buttons() const
+{
+    switch (install_.phase)
+    {
+    case SELF_UPDATE_STARTING:
+    case SELF_UPDATE_DOWNLOADING:
+    case SELF_UPDATE_UNPACKING:
+    case SELF_UPDATE_READY:
+        return {"Cancel"};
+    case SELF_UPDATE_APPLYING:
+        return {};
+    case SELF_UPDATE_FAILED:
+        return {"Try again", "Release page", "Close"};
+    default:
+        return {"Update now", "Later", "Release page"};
+    }
+}
+
+void App::update_dialog(const InputFrame &input)
+{
+    const std::vector<std::string> buttons = dialog_buttons();
+    if (buttons.empty())
+        return; // restarting
+    dialog_button_ = std::clamp(dialog_button_, 0, static_cast<int>(buttons.size()) - 1);
+    if (input.nav == Direction::left || input.nav == Direction::right)
+    {
+        const int n = static_cast<int>(buttons.size());
+        const int next = std::clamp(dialog_button_ + (input.nav == Direction::left ? -1 : 1), 0, n - 1);
+        if (next != dialog_button_)
+        {
+            dialog_button_ = next;
+            sound_move();
+        }
+    }
+    std::string choice;
+    if (input.is_pressed(Action::confirm))
+        choice = buttons[static_cast<std::size_t>(dialog_button_)];
+    else if (input.is_pressed(Action::back))
+        choice = buttons.size() == 1 ? buttons[0] : (install_.phase == SELF_UPDATE_FAILED ? "Close" : "Later");
+    if (choice.empty())
+        return;
+    if (choice == "Update now" || choice == "Try again")
+    {
+        audio::play(audio::Sfx::select);
+        status_time_ = -10.0f; // an old message would cover the progress
+        updater_->start();
+        install_ = updater_->poll();
+    }
+    else if (choice == "Cancel")
+    {
+        audio::play(audio::Sfx::back);
+        updater_->cancel();
+    }
+    else if (choice == "Release page")
+    {
+        open(update_release_.page.empty() ? kReleasesPage : update_release_.page, "the release page");
+    }
+    else // Later, Close
+    {
+        audio::play(audio::Sfx::back);
+        dialog_ = false;
+        dialog_dismissed_ = true;
+        if (install_.phase == SELF_UPDATE_FAILED)
+        {
+            updater_->clear();
+            install_ = self_update_status{};
+        }
+    }
+}
+
+void App::draw_update_dialog(gfx::DrawList &list) const
+{
+    const float t = std::min(dialog_time_ / 0.2f, 1.0f);
+    list.rounded_rect({0, 0, gfx::kVirtualWidth, gfx::kVirtualHeight}, 0, Color{0, 0, 0, 0.62f * t});
+    list.push_opacity(t);
+    list.push_transform(1.0f, 0, 0, 0, (1.0f - t) * 24.0f);
+    const Rect p{360, 200, 1200, 640};
+    list.shadow(p, 30, 48, Color{0, 0, 0, 0.6f});
+    list.rounded_rect(p, 30, kPanel);
+    list.bordered_rect(p, 30, kClear, 1.5f, kLine);
+    const float x = p.x + 56;
+    const float w = p.w - 112;
+
+    // a small badge: an arrow into a tray
+    const float bx = x + 34;
+    const float by = p.y + 86;
+    list.circle(bx, by, 34, install_.phase == SELF_UPDATE_FAILED ? kError.with_alpha(0.2f) : kAccent.with_alpha(0.18f));
+    const Color mark = install_.phase == SELF_UPDATE_FAILED ? kError : kAccent;
+    list.line(bx, by - 16, bx, by + 6, 5, mark);
+    list.triangle({bx - 11, by + 1, 22, 13}, mark, 0.0f, 3.14159f);
+    list.line(bx - 16, by + 17, bx + 16, by + 17, 4, mark);
+
+    const std::string have = std::string("You have ") + kVersion;
+    const auto progress_bar = [&](float y, double fraction) {
+        const Rect bar{x, y, w, 18};
+        list.rounded_rect(bar, 9, kBadge);
+        if (fraction > 0.0)
+            list.rounded_rect({bar.x, bar.y, std::max(18.0f, bar.w * static_cast<float>(std::min(fraction, 1.0))), bar.h},
+                              9, kAccent);
+    };
+    const auto megabytes = [](std::uint64_t bytes) {
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.1f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
+        return std::string(buf);
+    };
+
+    switch (install_.phase)
+    {
+    case SELF_UPDATE_STARTING:
+    case SELF_UPDATE_DOWNLOADING:
+    case SELF_UPDATE_UNPACKING:
+    case SELF_UPDATE_READY:
+    case SELF_UPDATE_APPLYING:
+    {
+        const char *title = install_.phase == SELF_UPDATE_STARTING      ? "Starting the update..."
+                            : install_.phase == SELF_UPDATE_DOWNLOADING ? "Downloading the update"
+                            : install_.phase == SELF_UPDATE_UNPACKING   ? "Unpacking the update"
+                                                                        : "Restarting to finish";
+        ui::text(list, fonts_.bold, title, x + 92, p.y + 84, 44, kText);
+        ui::text(list, fonts_.regular, std::string(kAppName) + " " + update_release_.version, x + 92, p.y + 124, 26,
+                 kMuted);
+        const float y = p.y + 210;
+        double fraction = 0.0;
+        std::string detail;
+        if (install_.phase == SELF_UPDATE_DOWNLOADING || install_.phase == SELF_UPDATE_UNPACKING)
+        {
+            fraction = install_.total > 0 ? static_cast<double>(install_.done) / static_cast<double>(install_.total) : 0.0;
+            detail = install_.total > 0 ? megabytes(install_.done) + " of " + megabytes(install_.total)
+                                        : megabytes(install_.done);
+            if (install_.time_left[0] != '\0')
+                detail += "  \xC2\xB7  " + std::string(install_.time_left);
+        }
+        else if (install_.phase == SELF_UPDATE_STARTING)
+        {
+            detail = "Handing the update to the update helper";
+        }
+        else
+        {
+            fraction = 1.0;
+            detail = "The app closes now. Open it again in a moment to use the new version.";
+        }
+        if (install_.phase == SELF_UPDATE_STARTING)
+            draw_spinner(list, x + 16, y + 9, 14);
+        else
+            progress_bar(y, fraction);
+        ui::text(list, fonts_.regular, detail, x, y + 70, 28, kText);
+        ui::paragraph(list, fonts_.regular,
+                      install_.phase == SELF_UPDATE_APPLYING
+                          ? "The new files go in place once the app has closed, and a notification says when."
+                          : "The download is checked against the release before anything is replaced. Cancel "
+                            "any time before the restart and nothing changes.",
+                      x, y + 130, 24, w, 34, kMuted, 3);
+        break;
+    }
+    case SELF_UPDATE_FAILED:
+    {
+        ui::text(list, fonts_.bold, "The update didn't finish", x + 92, p.y + 84, 44, kText);
+        ui::text(list, fonts_.regular, "Nothing was changed. " + have + ".", x + 92, p.y + 124, 26, kMuted);
+        float y = p.y + 214;
+        y = ui::paragraph(list, fonts_.bold, install_.error[0] ? install_.error : "The update failed.", x, y, 30, w,
+                          40, kText, 3);
+        ui::paragraph(list, fonts_.regular,
+                      "Updating from the app needs a payload loader listening on port 9021 (etaHEN, or kstuff "
+                      "with elfldr), and a folder install, not an image. You can also update from ProsperoStore, "
+                      "or download PPSA52005.zip from the release page.",
+                      x, y + 24, 26, w, 38, kMuted, 5);
+        break;
+    }
+    default:
+    {
+        ui::text(list, fonts_.bold, "A new version is out", x + 92, p.y + 84, 44, kText);
+        ui::text(list, fonts_.regular,
+                 std::string(kAppName) + " " + update_release_.version + "  \xC2\xB7  " + have, x + 92, p.y + 124, 26,
+                 kMuted);
+        ui::text(list, fonts_.bold, "WHAT'S NEW", x, p.y + 206, 18, kDim, Align::left, 3);
+        const std::string notes = update_release_.notes.empty() ? "See the release page for what changed."
+                                                                : update_release_.notes;
+        list.push_clip({x, p.y + 220, w, 300});
+        float y = p.y + 254;
+        std::size_t start = 0;
+        int lines = 0;
+        while (start < notes.size() && lines < 7)
+        {
+            std::size_t end = notes.find('\n', start);
+            if (end == std::string::npos)
+                end = notes.size();
+            const std::string line = notes.substr(start, end - start);
+            start = end + 1;
+            if (line.empty())
+            {
+                y += 14;
+                continue;
+            }
+            const bool item = line.rfind("- ", 0) == 0;
+            if (item)
+                list.circle(x + 8, y - 8, 4, kAccent);
+            y = ui::paragraph(list, fonts_.regular, item ? line.substr(2) : line, x + (item ? 26 : 0), y, 25,
+                              w - (item ? 26 : 0), 35, item ? kText : kAccentText, 2);
+            ++lines;
+        }
+        list.pop_clip();
+        break;
+    }
+    }
+
+    // the buttons
+    const std::vector<std::string> buttons = dialog_buttons();
+    float bx2 = x;
+    const float row_y = p.y + p.h - 112;
+    for (std::size_t i = 0; i < buttons.size(); ++i)
+    {
+        const bool primary = i == 0 && (buttons[i] == "Update now" || buttons[i] == "Try again");
+        const float bw = fonts_.bold.measure(buttons[i], 28) + 72;
+        const Rect r{bx2, row_y, bw, 68};
+        if (static_cast<int>(i) == dialog_button_)
+            draw_focus(list, r, 34);
+        list.rounded_rect(r, 34, primary ? kAccent : kPanelHi);
+        if (!primary)
+            list.bordered_rect(r, 34, kClear, 1.5f, kLine);
+        ui::text(list, fonts_.bold, buttons[i], r.cx(), r.cy() + 10, 28, primary ? kOnAccent : kText, Align::center);
+        bx2 += bw + 20;
+    }
+    list.pop_transform();
+    list.pop_opacity();
 }
 
 // ---- drawing ------------------------------------------------------------------
@@ -1255,7 +1623,17 @@ void App::draw_home(gfx::DrawList &list) const
         list.bordered_rect(r, 22, kClear, 1.5f, kLine);
         draw_tile_icon(list, item.kind, r.x + 76, r.cy());
         ui::text(list, fonts_.bold, tiles[i].title, r.x + 140, r.cy() - 4, 34, kText);
-        ui::text(list, fonts_.regular, tiles[i].detail, r.x + 140, r.cy() + 30, 22, kMuted);
+        if (item.kind == Kind::settings && update_state_ == Updater::State::available)
+        {
+            // an update waits: say so where the user will look
+            list.circle(r.x + 104, r.cy() - 28, 9, kAccent);
+            ui::text(list, fonts_.regular, "Update " + update_release_.version + " is ready to install", r.x + 140,
+                     r.cy() + 30, 22, kAccentText);
+        }
+        else
+        {
+            ui::text(list, fonts_.regular, tiles[i].detail, r.x + 140, r.cy() + 30, 22, kMuted);
+        }
         leave();
     }
 
@@ -1339,6 +1717,36 @@ void App::draw_settings(gfx::DrawList &list) const
             ui::text(list, fonts_.regular, name, right - 8 - w / 2 - 8, cy + 9, 26, kText, Align::center);
             break;
         }
+        case 5:
+        {
+            label("Updates");
+            std::string value;
+            Color colour = kMuted;
+            switch (update_state_)
+            {
+            case Updater::State::idle:
+                value = "Check now";
+                break;
+            case Updater::State::checking:
+                value = "Checking...";
+                break;
+            case Updater::State::up_to_date:
+                value = "Up to date";
+                break;
+            case Updater::State::available:
+                value = update_release_.version + " is ready to install";
+                colour = kAccentText;
+                break;
+            case Updater::State::unknown:
+                value = "Couldn't check: press Cross to try again";
+                colour = kDim;
+                break;
+            }
+            if (update_state_ == Updater::State::available)
+                list.circle(right - fonts_.regular.measure(value, 26) - 18, cy, 6, kAccent);
+            ui::text(list, fonts_.regular, value, right, cy + 9, 26, colour, Align::right);
+            break;
+        }
         case 4:
         {
             label("Clear recent pages and searches");
@@ -1352,17 +1760,18 @@ void App::draw_settings(gfx::DrawList &list) const
         }
     }
 
-    float y = settings_row(kSettingsRows - 1).y + 70 + 58;
+    float y = settings_row(kSettingsRows - 1).y + 70 + 48;
     ui::text(list, fonts_.bold, "ABOUT", p.x + 40, y, 18, kDim, Align::left, 3);
-    y += 42;
+    y += 38;
     const float w = p.w - 80;
     y = ui::paragraph(list, fonts_.regular,
                       std::string("KamTape for PS5 ") + kVersion +
                           ". An unofficial app, not made or endorsed by KamTape. Lists and details come from "
                           "KamTape's developer API.",
-                      p.x + 40, y, 24, w, 34, kText);
-    ui::paragraph(list, fonts_.regular, std::string("Source code and licence (GPL-3.0): ") + kSourceUrl, p.x + 40,
-                  y + 4, 24, w, 34, kMuted);
+                      p.x + 40, y, 22, w, 30, kText);
+    ui::paragraph(list, fonts_.regular,
+                  std::string("Source code and licence (GPL-3.0): ") + kSourceUrl + ". Updates come from its releases.",
+                  p.x + 40, y + 2, 22, w, 30, kMuted);
     list.pop_transform();
     list.pop_opacity();
 }
@@ -1635,6 +2044,8 @@ void App::draw(gfx::DrawList &list) const
     }
     draw_footer(list);
     osk_.draw(list, fonts_.regular, fonts_.bold);
+    if (dialog_)
+        draw_update_dialog(list);
     draw_status(list);
 }
 

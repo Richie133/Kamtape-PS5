@@ -1,18 +1,18 @@
-## What's new in 0.3.0
+## What's new in 0.4.0
 
-- The KamTape keyboard: the app's own on-screen keyboard, made for the controller, now used for Search and Go to a page
-  - A text cursor (L1/R1), Delete on Square, Space on Triangle, Caps on L3, Done on OPTIONS or R2
-  - Your last five searches (or pages) sit above the keys: one press runs them again
-  - On Go to a page, a kamtape.com/ key and Triangle types /
-- USB keyboard support: a keyboard plugged into the PS5 types into the KamTape keyboard, and moves around the app with the arrows, Enter and Escape; typing a letter on the home screen starts a search
-- Settings: choose the KamTape keyboard or the PS5 system keyboard, turn the USB keyboard on or off, clear recent searches too
-- If the PS5 system keyboard won't open, the KamTape keyboard opens instead
+- Updates from GitHub: when a new version is released, the app shows what's new and installs it for you, then restarts into it
+  - It checks GitHub a few seconds after starting; Settings > Updates checks again any time
+  - The download is checked (size and SHA-256) before anything is replaced; Cancel or a failure leaves the app as it was
+  - Needs a payload loader on port 9021 (etaHEN, or kstuff with elfldr) and a folder install; otherwise the dialog says why and offers the release page
+- Fixed: text typed quickly on a USB keyboard, followed by Enter in the same instant, was lost (the keyboard closed first)
+- Fixed: when loading more search results failed, scrolling down never tried again; it now retries after a few seconds and says what went wrong
+- Fixed: answers for screens you had already left were kept in memory
+- Fixed: KamTape answers starting with a byte-order mark, or without a status, were read as errors
+- New tests: release reading, and a fuzz run of everything that reads network data
 
-## Still here
+## Updating from 0.3.0
 
-- Featured videos, search by tag and video details, from KamTape's developer API
-- KamTape XL opens in the PS5 browser when the app starts (can be turned off in Settings)
-- Go to a page for any KamTape address, and Recent pages
+0.3.0 can't update itself yet: install this version from ProsperoStore or by copying the folder. From 0.4.0 on, updates install from the app.
 
 ## Install
 

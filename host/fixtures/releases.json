@@ -1,0 +1,33 @@
+[
+  {
+    "tag_name": "v0.9.9-beta",
+    "name": "KamTape for PS5 0.9.9-beta",
+    "draft": false,
+    "prerelease": true,
+    "html_url": "https://github.com/Richie133/Kamtape-PS5/releases/tag/v0.9.9-beta",
+    "body": "## What's new in 0.9.9\n\n- Sample release for the PC build: this text stands in for real notes\n- Plays the update screens from start to finish\n- **Nothing** here is downloaded from GitHub\n\n`PPSA52005.zip` sha256: `a6374f8c7b638bbfede96ab151f60f927893174ac52c2b63156cca5b365a60d4`\ncontentVersion: `01.000.099`\n",
+    "assets": [
+      {
+        "name": "PPSA52005.zip",
+        "size": 300868,
+        "digest": "sha256:a6374f8c7b638bbfede96ab151f60f927893174ac52c2b63156cca5b365a60d4",
+        "browser_download_url": "https://github.com/Richie133/Kamtape-PS5/releases/download/v0.9.9-beta/PPSA52005.zip"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.3.0-beta",
+    "name": "KamTape for PS5 0.3.0-beta",
+    "draft": false,
+    "prerelease": true,
+    "html_url": "https://github.com/Richie133/Kamtape-PS5/releases/tag/v0.3.0-beta",
+    "body": "## What's new in 0.3.0\n\n`PPSA52005.zip` sha256: `0000000000000000000000000000000000000000000000000000000000000000`\n",
+    "assets": [
+      {
+        "name": "PPSA52005.zip",
+        "size": 1,
+        "browser_download_url": "https://github.com/Richie133/Kamtape-PS5/releases/download/v0.3.0-beta/PPSA52005.zip"
+      }
+    ]
+  }
+]

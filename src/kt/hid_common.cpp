@@ -78,7 +78,9 @@ void Tracker::keyboard_record(const KeyboardRecord &r, Port &port, Frame &frame)
 void Tracker::press(std::uint16_t usage, Frame &frame)
 {
     frame.pressed.push_back(usage);
-    if (const char c = char_for(usage, shift_, caps_))
+    const char c = char_for(usage, shift_, caps_);
+    frame.typed.push_back(c);
+    if (c)
         frame.text.push_back(c);
     repeat_key_ = usage;
     repeat_at_ = now_ + 0.45;

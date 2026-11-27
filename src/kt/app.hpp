@@ -13,6 +13,7 @@
 #include "kt/osk.hpp"
 #include "kt/settings.hpp"
 #include "kt/thumbs.hpp"
+#include "kt/updater.hpp"
 #include "ui/fonts.hpp"
 
 #include <cstdint>
@@ -23,7 +24,7 @@
 namespace hui::kt
 {
 
-constexpr const char *kVersion = "0.3.0 beta";
+constexpr const char *kVersion = "0.4.0 beta";
 constexpr const char *kSourceUrl = "github.com/Richie133/Kamtape-PS5";
 
 struct Fonts
@@ -37,8 +38,10 @@ class App
   public:
     // logo: GL texture of the KamTape wordmark (0 writes the name instead),
     // logo_aspect its width / height. settings_dir holds settings.json (and
-    // an optional api.json, see kt/config.hpp).
-    App(const Fonts &fonts, std::uint32_t logo, float logo_aspect, std::string settings_dir);
+    // an optional api.json, see kt/config.hpp). param_path: the running app's
+    // sce_sys/param.json, for the update check.
+    App(const Fonts &fonts, std::uint32_t logo, float logo_aspect, std::string settings_dir,
+        std::string param_path);
     ~App();
 
     // usb: what a USB keyboard typed this frame (empty when there is none).
@@ -112,7 +115,8 @@ class App
         int next_page = 1;
         bool more = false;
         int ticket = 0; // the request on its way, 0 for none
-        std::string error;
+        std::string error;     // the list couldn't load (nothing to show)
+        float retry_at = 0.0f; // loading more failed: not again before this time
         int focus = 0;
         int top_row = 0;
         float scroll = 0.0f; // drawn top row, chasing top_row
@@ -132,6 +136,7 @@ class App
     // pages
     void push_list(ListKind kind, const std::string &arg);
     void push_details(const Video &video);
+    void pop_page();
     void load_more(Page &page);
     void collect(Page &page);
     void update_videos(Page &page, const InputFrame &input);
@@ -148,6 +153,12 @@ class App
     void sound_move() const;
     void save();
     gfx::Rect focus_target() const;
+    // updates
+    void check_updates(bool asked);
+    void watch_updates();
+    void update_dialog(const InputFrame &input);
+    void draw_update_dialog(gfx::DrawList &list) const;
+    std::vector<std::string> dialog_buttons() const;
 
     // drawing
     void draw_background(gfx::DrawList &list) const;
@@ -176,6 +187,7 @@ class App
     Settings settings_;
     std::unique_ptr<Thumbs> thumbs_;
     std::unique_ptr<ApiClient> api_;
+    std::unique_ptr<Updater> updater_;
 
     Screen screen_ = Screen::home; // home or settings, under any pages
     std::vector<Page> pages_;
@@ -192,6 +204,18 @@ class App
     float last_open_ = -10.0f; // when the browser was last asked to open
     Keyboard keyboard_ = Keyboard::none; // what's being typed for, by either keyboard
     OnScreenKeyboard osk_;
+
+    // updates: the dialog, what it last showed, and when the app should close after applying
+    bool dialog_ = false;
+    bool dialog_dismissed_ = false; // "Later": not again this launch
+    bool check_asked_ = false;      // the user asked: say "up to date" too
+    bool update_checked_ = false;   // the check at start-up is done
+    int dialog_button_ = 0;
+    float dialog_time_ = 0.0f;
+    Updater::State update_state_ = Updater::State::idle;
+    Release update_release_;
+    self_update_status install_{};
+    float quit_at_ = -1.0f;
 
     std::string status_;
     bool status_error_ = false;

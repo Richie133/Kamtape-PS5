@@ -133,3 +133,48 @@ def video_list(videos):
 for i, v in enumerate(VIDEOS):
     thumb(HERE / "thumbs" / f"{v[0]}.jpg", i)
 print("fixtures written")
+
+# ---- a release for the updater: a zip laid out like the real one, and GitHub's
+# answer listing it (plus an older release from before the app could update)
+import hashlib
+import io
+import json
+import zipfile
+
+param = json.loads((HERE.parent.parent / "sce_sys" / "param.json").read_text())
+param["contentVersion"] = "01.000.099"
+buffer = io.BytesIO()
+with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("PPSA52005/sce_sys/param.json", json.dumps(param, indent=2))
+    z.writestr("PPSA52005/eboot.bin", bytes(rng.getrandbits(8) for _ in range(300000)))
+data = buffer.getvalue()
+(HERE / "update.zip").write_bytes(data)
+digest = hashlib.sha256(data).hexdigest()
+notes = (
+    "## What's new in 0.9.9\n\n"
+    "- Sample release for the PC build: this text stands in for real notes\n"
+    "- Plays the update screens from start to finish\n"
+    "- **Nothing** here is downloaded from GitHub\n\n"
+    f"`PPSA52005.zip` sha256: `{digest}`\n"
+    "contentVersion: `01.000.099`\n"
+)
+releases = [
+    {
+        "tag_name": "v0.9.9-beta", "name": "KamTape for PS5 0.9.9-beta", "draft": False, "prerelease": True,
+        "html_url": "https://github.com/Richie133/Kamtape-PS5/releases/tag/v0.9.9-beta", "body": notes,
+        "assets": [{
+            "name": "PPSA52005.zip", "size": len(data), "digest": "sha256:" + digest,
+            "browser_download_url": "https://github.com/Richie133/Kamtape-PS5/releases/download/v0.9.9-beta/PPSA52005.zip",
+        }],
+    },
+    {
+        "tag_name": "v0.3.0-beta", "name": "KamTape for PS5 0.3.0-beta", "draft": False, "prerelease": True,
+        "html_url": "https://github.com/Richie133/Kamtape-PS5/releases/tag/v0.3.0-beta",
+        "body": "## What's new in 0.3.0\n\n`PPSA52005.zip` sha256: `" + "0" * 64 + "`\n",
+        "assets": [{"name": "PPSA52005.zip", "size": 1, "browser_download_url":
+                    "https://github.com/Richie133/Kamtape-PS5/releases/download/v0.3.0-beta/PPSA52005.zip"}],
+    },
+]
+(HERE / "releases.json").write_text(json.dumps(releases, indent=2) + "\n")
+(HERE / "releases-none.json").write_text("[]\n")
+print("update fixtures written")

@@ -265,6 +265,15 @@ for asset in icon0.png pic0.dds pic1.dds snd0.at9; do
     [[ -f $root/sce_sys/$asset ]] && cp "$root/sce_sys/$asset" "$app/sce_sys/$asset"
 done
 [[ ! -d $root/assets ]] || cp -a "$root/assets" "$app/assets"
+# The self-update helper (third_party/self_update_helper, the boilerplate's, as
+# ProsperoRadio carries it) is an ordinary payload: the app sends it to the
+# console's payload loader when the user accepts an update.
+make -s -C "$root/third_party/self_update_helper" PS5_PAYLOAD_SDK="$sdk_root" \
+    OUTPUT="$build/self-update/self-updater.elf"
+python3 "$root/tools/validate-loader-elf.py" "$build/self-update/self-updater.elf"
+cp "$build/self-update/self-updater.elf" "$app/self-updater.elf"
+mkdir -p "$app/licenses"
+cp "$root/third_party/miniz/LICENSE" "$app/licenses/miniz-MIT.txt"
 # Directory listing returns nothing under /app0 on the console, so each
 # audio folder carries an index of its files (read by save::list_files).
 for dir in "$app/assets/audio/music" "$app"/assets/audio/sfx/*/; do

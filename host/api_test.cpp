@@ -50,6 +50,7 @@ int main(int argc, char **argv)
             check(root->child_text("d") == "<raw>", "CDATA");
             check(root->child_text("e") == "Odd & Outrageous", "a bare ampersand");
         }
+        check(parse_xml("\xEF\xBB\xBF<a>bom</a>") != nullptr, "a byte-order mark");
         check(parse_xml("<a><b></a>") == nullptr, "mismatched tags fail");
         check(parse_xml("not xml") == nullptr, "text fails");
         check(parse_xml("<a>") == nullptr, "unclosed fails");
@@ -76,6 +77,12 @@ int main(int argc, char **argv)
         const ApiError e3 = parse_video_list(fixture(dir, "fail.xml"), &none);
         check(e3.failed && e3.message.find("dev_id") != std::string::npos, "API error message");
         check(parse_video_list("<html>oops</html>", &none).failed, "not the API's XML");
+        std::vector<Video> nostatus;
+        check(!parse_video_list("<ut_response><video_list><video><id>a</id></video></video_list></ut_response>",
+                                &nostatus)
+                       .failed &&
+                  nostatus.size() == 1,
+              "ut_response without a status");
     }
     {
         VideoDetails d;

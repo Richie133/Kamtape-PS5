@@ -16,7 +16,8 @@ constexpr std::uint32_t kMouseMiddle = 4;
 struct Frame
 {
     std::vector<std::uint16_t> pressed; // USB HID usages, with auto-repeat
-    std::vector<char> text;             // characters typed (US layout)
+    std::vector<char> typed;            // per pressed key, the character it typed (0: none)
+    std::vector<char> text;             // the characters typed, in order (US layout)
     int dx = 0, dy = 0, wheel = 0;
     std::uint32_t buttons = 0, clicked = 0;
     bool shift = false;
